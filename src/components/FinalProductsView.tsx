@@ -59,12 +59,26 @@ export function FinalProductsView({
 
   const todayStr = getTodayDateStr();
 
-  // Today's summary metrics for Producto Terminado
+  const [historyFilter, setHistoryFilter] = useState<
+    'todos' | 'ventas' | 'produccion' | 'hoy'
+  >('todos');
+
+  const finalProductMap = useMemo(
+    () => new Map(finalProducts.map((it) => [it.id, it])),
+    [finalProducts]
+  );
+
+  // Today's summary metrics & full Producto Terminado movement history
   const dailySummary = useMemo(() => {
-    const todayFinalMovs = movements.filter(
-      (m) =>
-        m.classification === 'Producto Terminado' &&
-        m.dateTime.slice(0, 10) === todayStr
+    const allFinalMovs = movements
+      .filter((m) => m.classification === 'Producto Terminado')
+      .sort(
+        (a, b) =>
+          new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+      );
+
+    const todayFinalMovs = allFinalMovs.filter(
+      (m) => m.dateTime.slice(0, 10) === todayStr
     );
 
     const producedToday = todayFinalMovs
@@ -89,17 +103,23 @@ export function FinalProductsView({
       0
     );
 
+    const visibleMovements = allFinalMovs.filter((m) => {
+      if (historyFilter === 'hoy') return m.dateTime.slice(0, 10) === todayStr;
+      if (historyFilter === 'ventas') return m.type === 'salida';
+      if (historyFilter === 'produccion') return m.type === 'entrada';
+      return true;
+    });
+
     return {
       producedToday,
       soldToday,
       salesRevenueToday,
       totalStockUnits,
-      todayMovements: todayFinalMovs.sort(
-        (a, b) =>
-          new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
-      ),
+      todayMovements: todayFinalMovs,
+      allFinalMovs,
+      visibleMovements,
     };
-  }, [movements, finalProducts, todayStr]);
+  }, [movements, finalProducts, todayStr, historyFilter]);
 
   // Production form state
   const [prodItemId, setProdItemId] = useState<string>(
@@ -1236,74 +1256,121 @@ export function FinalProductsView({
         </div>
       </div>
 
-      {/* Movimientos de hoy en Producto Final */}
+      {/* Historial de Producto Final (producción y ventas del mes / hoy) */}
       <div className="bg-[#fff8f5] border border-[#eadfd8] rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#eadfd8]">
-          <h2 className="text-base font-bold text-[#3b1e14]">
-            Movimientos de hoy en Producto Final
-          </h2>
-          <p className="text-xs text-[#6d4c41] mt-0.5 tabular-nums">
-            {dailySummary.todayMovements.length} registros realizados hoy
-          </p>
+        <div className="px-5 py-4 border-b border-[#eadfd8] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-[#3b1e14]">
+              Movimientos y ventas en Producto Final
+            </h2>
+            <p className="text-xs text-[#6d4c41] mt-0.5 tabular-nums">
+              Mostrando {dailySummary.visibleMovements.length} de{' '}
+              {dailySummary.allFinalMovs.length} registros en vitrina
+            </p>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Filtrar movimientos de Producto Final"
+            className="inline-flex flex-wrap p-1 rounded-xl bg-[#efe5df] border border-[#eadfd8]"
+          >
+            {(
+              [
+                { id: 'todos', label: `Todos (${dailySummary.allFinalMovs.length})` },
+                { id: 'ventas', label: 'Solo ventas' },
+                { id: 'produccion', label: 'Solo producción' },
+                { id: 'hoy', label: `Hoy (${dailySummary.todayMovements.length})` },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setHistoryFilter(tab.id)}
+                className={`px-3 py-1.5 min-h-[34px] rounded-lg text-xs font-semibold tabular-nums whitespace-nowrap transition-colors cursor-pointer ${
+                  historyFilter === tab.id
+                    ? 'bg-[#3b1e14] text-[#fff8f5]'
+                    : 'text-[#5a3b2e] hover:text-[#3b1e14]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="divide-y divide-[#eadfd8]">
-          {dailySummary.todayMovements.map((m) => (
-            <div
-              key={m.id}
-              className="px-5 py-3.5 flex items-center justify-between gap-3 text-sm"
-            >
-              <div className="min-w-0">
-                <div className="font-semibold text-[#3b1e14] truncate">
-                  {m.itemName}
-                </div>
-                <div className="text-xs text-[#6d4c41] mt-0.5">
+        <div className="max-h-[420px] overflow-y-auto divide-y divide-[#eadfd8]">
+          {dailySummary.visibleMovements.map((m) => {
+            const linked = finalProductMap.get(m.itemId);
+            return (
+              <div
+                key={m.id}
+                className="px-5 py-3.5 flex items-center justify-between gap-3 text-sm hover:bg-[#fdf3ee] transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
                   <span
-                    className={`font-semibold ${
-                      m.type === 'entrada' ? 'text-[#16a34a]' : 'text-[#9d176d]'
-                    }`}
+                    aria-hidden="true"
+                    className="w-8 h-8 rounded-lg bg-[#f7ede7] border border-[#eadfd8] flex items-center justify-center text-base shrink-0 select-none"
                   >
-                    {m.type === 'entrada' ? 'Producción' : 'Venta / Salida'}
+                    {getItemIcon(
+                      linked || {
+                        name: m.itemName,
+                        classification: m.classification,
+                      }
+                    )}
                   </span>
-                  <span className="mx-1.5" aria-hidden="true">·</span>
-                  {formatDateTimeDisplay(m.dateTime)}
-                  <span className="mx-1.5" aria-hidden="true">·</span>
-                  {m.responsible}
-                  {m.expiryDate ? ` · Vence: ${formatDateDisplay(m.expiryDate)}` : ''}
-                  {m.notes ? ` · ${m.notes}` : ''}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[#3b1e14] truncate">
+                      {m.itemName}
+                    </div>
+                    <div className="text-xs text-[#6d4c41] mt-0.5">
+                      <span
+                        className={`font-semibold ${
+                          m.type === 'entrada' ? 'text-[#16a34a]' : 'text-[#9d176d]'
+                        }`}
+                      >
+                        {m.type === 'entrada' ? 'Producción' : 'Venta / Salida'}
+                      </span>
+                      <span className="mx-1.5" aria-hidden="true">·</span>
+                      {formatDateTimeDisplay(m.dateTime)}
+                      <span className="mx-1.5" aria-hidden="true">·</span>
+                      {m.responsible}
+                      {m.expiryDate ? ` · Vence: ${formatDateDisplay(m.expiryDate)}` : ''}
+                      {m.notes ? ` · ${m.notes}` : ''}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="text-right tabular-nums">
-                  <div
-                    className={`font-bold ${
-                      m.type === 'entrada' ? 'text-[#16a34a]' : 'text-[#9d176d]'
-                    }`}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right tabular-nums">
+                    <div
+                      className={`font-bold ${
+                        m.type === 'entrada' ? 'text-[#16a34a]' : 'text-[#9d176d]'
+                      }`}
+                    >
+                      {m.type === 'entrada' ? '+' : '-'}
+                      {formatNumber(m.quantity)} {m.unit}
+                    </div>
+                    <div className="text-xs font-semibold text-[#3b1e14]">
+                      {formatCurrency(m.totalCost)}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onDeleteMovement(m.id)}
+                    aria-label={`Eliminar movimiento de ${m.itemName}`}
+                    className="p-2 rounded-lg text-[#8c6d62] hover:text-[#dc2626] hover:bg-[#fef2f2] cursor-pointer"
                   >
-                    {m.type === 'entrada' ? '+' : '-'}
-                    {formatNumber(m.quantity)} {m.unit}
-                  </div>
-                  <div className="text-xs font-semibold text-[#3b1e14]">
-                    {formatCurrency(m.totalCost)}
-                  </div>
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => onDeleteMovement(m.id)}
-                  aria-label={`Eliminar movimiento de ${m.itemName}`}
-                  className="p-2 rounded-lg text-[#8c6d62] hover:text-[#dc2626] hover:bg-[#fef2f2] cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {dailySummary.todayMovements.length === 0 && (
+          {dailySummary.visibleMovements.length === 0 && (
             <div className="p-8 text-center text-sm text-[#6d4c41]">
-              Aún no se han registrado producciones ni ventas de tortas hoy.
+              No hay movimientos en Producto Final para el filtro seleccionado.
             </div>
           )}
         </div>

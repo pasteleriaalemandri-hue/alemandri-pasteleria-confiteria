@@ -75,12 +75,36 @@ export const EXIT_REASONS = [
 ] as const;
 
 export const RESPONSIBLES = [
-  'Lucía Alemandri',
-  'Mateo Vargas',
-  'Sofía Méndez',
-  'Carlos Paredes',
-  'Elena Rojas',
+  'Marcia',
+  'Natty',
+  'Monica',
+  'Jossy',
+  'Yenali',
+  'Esther',
+  'Romina',
 ] as const;
+
+const LEGACY_OPERATOR_MAP: Record<string, (typeof RESPONSIBLES)[number]> = {
+  'lucía alemandri': 'Marcia',
+  'lucia alemandri': 'Marcia',
+  'mateo vargas': 'Natty',
+  'sofía méndez': 'Monica',
+  'sofia mendez': 'Monica',
+  'carlos paredes': 'Jossy',
+  'elena rojas': 'Esther',
+};
+
+export function normalizeResponsibleName(raw?: string): string {
+  const cleaned = (raw || '').trim();
+  if (!cleaned) return RESPONSIBLES[0];
+  const exact = RESPONSIBLES.find(
+    (name) => name.toLowerCase() === cleaned.toLowerCase()
+  );
+  if (exact) return exact;
+  const mapped = LEGACY_OPERATOR_MAP[cleaned.toLowerCase()];
+  if (mapped) return mapped;
+  return RESPONSIBLES[0];
+}
 
 export const BAKERY_ICON_OPTIONS: { emoji: string; label: string }[] = [
   { emoji: '🌾', label: 'Harina / Granos' },
@@ -182,6 +206,50 @@ export function getItemIcon(
       return '🎂';
     default:
       return '🧁';
+  }
+}
+
+export function getItemSubdivision(
+  item: Pick<InventoryItem, 'name' | 'classification' | 'presentation'>
+): string {
+  const n = item.name.toLowerCase();
+  switch (item.classification) {
+    case 'Materia Prima':
+      if (n.includes('harina') || n.includes('quinua')) return 'Granos y Harinas';
+      return 'Endulzantes y Aceites';
+    case 'Insumos — Secos':
+      if (n.includes('colorante')) return 'Colorantes';
+      if (n.includes('polvo') || n.includes('maicena')) return 'Leudantes y Almidones';
+      return 'Esencias y Especias';
+    case 'Insumos — Lácteos y Refrigerados':
+      if (n.includes('huevo')) return 'Huevos';
+      return 'Cremas y Quesos';
+    case 'Insumos — Decoración y Cacao':
+      if (
+        n.includes('cacao') ||
+        n.includes('choc') ||
+        n.includes('chocolate')
+      ) {
+        return 'Cacao y Chocolates';
+      }
+      return 'Jaleas y Rellenos';
+    case 'Empaque':
+      if (n.includes('base de plastoformo')) return 'Bases de plastoformo';
+      if (n.includes('caja') || n.includes('domo') || n.includes('envase')) {
+        return 'Cajas y Domos';
+      }
+      return 'Envoltura y Accesorios';
+    case 'Producto Terminado':
+      if (n.includes('porción') || n.includes('porcion')) return 'Porciones';
+      if (
+        item.presentation?.toLowerCase().includes('especial') ||
+        n.includes('especial')
+      ) {
+        return 'Tortas Especiales (Mediana 2)';
+      }
+      return 'Tortas de Vitrina';
+    default:
+      return 'General';
   }
 }
 

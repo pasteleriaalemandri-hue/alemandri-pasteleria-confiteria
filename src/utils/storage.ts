@@ -1,4 +1,9 @@
-import { AppSettings, InventoryItem, MovementRecord } from '../types';
+import {
+  AppSettings,
+  InventoryItem,
+  MovementRecord,
+  normalizeResponsibleName,
+} from '../types';
 import { createSeedInventory, createSeedMovements } from '../data/seedData';
 
 const LEGACY_KEYS = [
@@ -8,9 +13,19 @@ const LEGACY_KEYS = [
   'alemandri_movements_v2',
   'alemandri_inventory_v3',
   'alemandri_movements_v3',
+  'alemandri_inventory_v4',
+  'alemandri_movements_v4',
+  'alemandri_inventory_v5',
+  'alemandri_movements_v5',
+  'alemandri_inventory_v6',
+  'alemandri_movements_v6',
+  'alemandri_inventory_v7',
+  'alemandri_movements_v7',
 ];
-const INVENTORY_KEY = 'alemandri_inventory_v4';
-const MOVEMENTS_KEY = 'alemandri_movements_v4';
+const INVENTORY_KEY = 'alemandri_inventory_v8';
+const MOVEMENTS_KEY = 'alemandri_movements_v8';
+const SEED_VERSION_KEY = 'alemandri_seed_version';
+const CURRENT_SEED_VERSION = '2026-11-nov-v8';
 const SETTINGS_KEY = 'alemandri_settings_v1';
 
 export const DEFAULT_LOGO_URL =
@@ -24,8 +39,25 @@ export function clearLegacyStorage(): void {
   }
 }
 
-export function loadInventory(): InventoryItem[] {
+function ensureLatestSeedApplied(): void {
   clearLegacyStorage();
+  try {
+    if (localStorage.getItem(SEED_VERSION_KEY) === CURRENT_SEED_VERSION) {
+      return;
+    }
+    clearAllDataStorage();
+    const seededInv = createSeedInventory();
+    const seededMov = createSeedMovements();
+    saveInventory(seededInv);
+    saveMovements(seededMov);
+    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
+  } catch {
+    // Ignore storage errors silently
+  }
+}
+
+export function loadInventory(): InventoryItem[] {
+  ensureLatestSeedApplied();
   try {
     const raw = localStorage.getItem(INVENTORY_KEY);
     if (!raw) {
@@ -54,7 +86,7 @@ export function saveInventory(items: InventoryItem[]): void {
 }
 
 export function loadMovements(): MovementRecord[] {
-  clearLegacyStorage();
+  ensureLatestSeedApplied();
   try {
     const raw = localStorage.getItem(MOVEMENTS_KEY);
     if (!raw) {
@@ -64,7 +96,10 @@ export function loadMovements(): MovementRecord[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      return parsed.map((m) => ({
+        ...m,
+        responsible: normalizeResponsibleName(m?.responsible),
+      }));
     }
   } catch {
     // Fallback to seed data
@@ -140,5 +175,10 @@ export function resetDemoData(): {
   const movements = createSeedMovements();
   saveInventory(inventory);
   saveMovements(movements);
+  try {
+    localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
+  } catch {
+    // Ignore storage errors silently
+  }
   return { inventory, movements };
 }

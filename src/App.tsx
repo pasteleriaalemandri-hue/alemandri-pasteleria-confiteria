@@ -8,6 +8,7 @@ import {
   MovementType,
   PrefillMovement,
   convertQuantity,
+  normalizeResponsibleName,
 } from './types';
 import {
   DEFAULT_LOGO_URL,
@@ -269,6 +270,7 @@ export default function App() {
             quantity: Number(mv.quantity) || 0,
             totalCost: Number(mv.totalCost) || 0,
             purchaseType: mv.purchaseType || undefined,
+            responsible: normalizeResponsibleName(mv.responsible),
             expiryDate: mv.expiryDate
               ? String(mv.expiryDate).slice(0, 10)
               : undefined,
