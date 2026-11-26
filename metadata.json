@@ -1,0 +1,6 @@
+{
+  "name": "Alemandri — Pastelería y Confitería",
+  "description": "Sistema de gestión de inventario, compras, retiros y reportes para Alemandri — Pastelería y Confitería.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
